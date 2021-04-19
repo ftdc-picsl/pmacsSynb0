@@ -218,7 +218,7 @@ cmd="singularity run \
   $userArgs"
 
 echo "
---- prep command ---
+--- full command ---
 $cmd
 ---
 "
