@@ -1,5 +1,7 @@
 #!/bin/bash -e
 
+module load singularity/3.8.3
+
 cleanup=1
 fsLicense="/appl/freesurfer-7.1.1/license.txt"
 
@@ -20,8 +22,10 @@ should exist under /path/to/bids.
 Using the options below, specify paths on the local file system. These will be bound automatically
 to locations inside the container. If needed, you can add extra mount points with '-B'.
 
-Any args after the '--' should reference paths within the container. Currently, the only supported extra
-arg is `--notopup`, which prevents topup running automatically after the distortion correction.
+Any args after the '--' should reference paths within the container. Currently, supported extra
+arg are:
+  --notopup prevents topup running automatically after the distortion correction.
+  --stripped input T1w is skull-stripped.
 
 Required args:
 
@@ -90,6 +94,9 @@ From Synb0-DISCO:
   Skips the application of FSL's topup susceptibility correction. As a default, we run topup for you, although you
   may want to run this on your own (for example with your own config file, or if you would like to utilize multiple
   b0's).
+
+--stripped
+  Input T1w is skull-stripped, so the built-in skull stripping is skipped.
 
 
 https://github.com/MASILab/Synb0-DISCO
