@@ -184,7 +184,7 @@ export SINGULARITYENV_ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=${LSB_DJOB_NUMPROC}
 export SINGULARITYENV_OMP_NUMTHREADS=${LSB_DJOB_NUMPROC}
 
 # singularity args
-singularityArgs="--cleanenv \
+singularityArgs="--cleanenv --no-home \
   -B ${jobTmpDir}:/tmp \
   -B ${fsLicense}:/extra/freesurfer/license.txt \
   -B ${inputDir}:/INPUTS \
