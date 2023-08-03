@@ -14,10 +14,9 @@ function usage() {
 
 function help() {
     usage
-  echo "This script handles various configuration options and bind points needed to run preps on the cluster.
+  echo "Wrapper for SynB0 distortion correction.
 
-Use absolute paths, as these have to be mounted in the container. Participant BIDS data
-should exist under /path/to/bids.
+Use absolute paths, as these have to be mounted in the container.
 
 Using the options below, specify paths on the local file system. These will be bound automatically
 to locations inside the container. If needed, you can add extra mount points with '-B'.
@@ -46,8 +45,6 @@ Options:
   -B src:dest[,src:dest,...,src:dest]
      Use this to add mount points to bind inside the container, that aren't handled by other options.
      'src' is an absolute path on the local file system and 'dest' is an absolute path inside the container.
-     Several bind points are always defined inside the container including \$HOME, \$PWD (where script is
-     executed from), and /tmp (more on this below).
 
   -c 1/0
      Cleanup the working dir after running the prep (default = $cleanup).
@@ -175,7 +172,7 @@ jobTmpDir=$( mktemp -d -p ${SINGULARITY_TMPDIR} synb0.${LSB_JOBID}.XXXXXXXX.tmpd
     ( echo "Could not create job temp dir ${jobTmpDir}"; exit 1 )
 
 # Not all software uses TMPDIR
-# module DEV/singularity sets SINGULARITYENV_TMPDIR=/scratch
+# module singularity sets SINGULARITYENV_TMPDIR=/scratch
 # We will make a temp dir there and bind to /tmp in the container
 export SINGULARITYENV_TMPDIR="/tmp"
 
