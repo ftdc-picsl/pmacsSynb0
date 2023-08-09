@@ -2,6 +2,7 @@
 
 module load miniconda/3-22.11
 module load singularity/3.8.3
+module load fsl/6.0.3
 
 scriptPath=$(readlink -f "$0")
 scriptDir=$(dirname "${scriptPath}")
@@ -29,7 +30,7 @@ cat << HELP
 
   bidsSynB0 options (note that the -c arg is provided automatically by this wrapper):
 
-  `conda run -p /project/ftdc_pipeline/ftdc-picsl/miniconda/envs/ftdc-picsl-cp11 ${repoDir}/scripts/bidsSynB0.py -h`
+  `conda run -p /project/ftdc_pipeline/ftdc-picsl/miniconda/envs/ftdc-picsl-cp311 ${repoDir}/scripts/bidsSynB0.py -h`
 
 
 HELP
@@ -65,5 +66,5 @@ if [[ ! -d ${logDir} ]]; then
 fi
 
 bsub -cwd . -o "${logDir}/synb0_${date}_%J.txt" \
-    conda run -p /project/ftdc_pipeline/ftdc-picsl/miniconda/envs/ftdc-picsl-cp11 ${repoDir}/scripts/bidsSynB0.py \
+    conda run -p /project/ftdc_pipeline/ftdc-picsl/miniconda/envs/ftdc-picsl-cp311 ${repoDir}/scripts/bidsSynB0.py \
       --container ${repoDir}/containers/synb0-${synB0Version}.sif $*
