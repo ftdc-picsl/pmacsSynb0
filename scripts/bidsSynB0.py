@@ -131,7 +131,7 @@ optional.add_argument("--t1w-image-suffix", help="Use a specific T1w head image 
 optional.add_argument("--t1w-mask-dataset", help="BIDS dataset to use for brain masking the T1w. If not specified, "
                       "synB0's internal algorithm is used for brain masking", type=str, default=None)
 optional.add_argument("-w", "--work-dir", help="Temp dir for intermediate output, defaults to system "
-                      "TMPDIR if defined, otherwise '/tmp'", type=str, default=os.environ.get('TMPDIR', '/scratch'))
+                      "TMPDIR if defined, otherwise '/scratch'", type=str, default=os.environ.get('TMPDIR', '/scratch'))
 
 
 args = parser.parse_args()
