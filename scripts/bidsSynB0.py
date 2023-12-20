@@ -18,7 +18,6 @@ def _filter_pybids_none_any(dct):
         for k, v in dct.items()
     }
 
-
 def bids_filter(value):
     from bids.layout import Query
 
@@ -58,6 +57,36 @@ def get_dwi_images(layout, subject_label, session_label, filter_criteria):
 
     return grouped_images
 
+
+def get_t1w_skull_stripped(dataset, participant_label, session_label, t1w_filename):
+    # Look in the mask dataset for a T1w mask matching the T1w image
+    mask_dir = os.path.join(dataset, f"sub-{participant_label}", f"ses-{session_label}", 'anat')
+    # Get all json files in the mask directory
+    mask_sidecars = [f for f in os.listdir(mask_dir) if f.endswith('_mask.json')]
+
+    t1w_mask = None
+    t1w_skull_stripped_path = None
+
+    for mask_sidecar in mask_sidecars:
+        # Load the sidecar
+        with open(os.path.join(mask_dir, mask_sidecar)) as json_file:
+            mask_json = json.load(json_file)
+            # Check if the T1w image matches the T1w image in the mask sidecar
+            if mask_json['Sources'][0].endswith(t1w_filename):
+                # Found a match
+                t1w_mask = os.path.join(mask_dir, mask_sidecar.replace('.json', '.nii.gz'))
+                break
+
+    if t1w_mask is not None:
+        print("Using T1w mask " + t1w_mask)
+        t1w_skull_stripped_path = os.path.join(working_dir, "t1w_skull_stripped.nii.gz")
+        t1w_is_skull_stripped = True
+        subprocess.run(["fslmaths", t1w_path, "-mas", t1w_mask, t1w_skull_stripped_path])
+
+    return t1w_skull_stripped_path
+
+
+
 # parse arguments with argparse
 # if no args, print usage
 parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
@@ -94,13 +123,15 @@ optional.add_argument("-n", "--num-threads", help="Number of computational threa
 optional.add_argument("-t", "--total-readout-time", help="Total readout time for DWI. Some older DICOM files "
                       "do not provide this information, so it can be specified manually. Ignored if the BIDS "
                       "sidecar contains total readout time", type=str, default=None)
+optional.add_argument("--combine-all-dwis", help="Combine all DWIs into one group. Useful for when the acq-label is not "
+                      "sufficient to group scans", action='store_true')
 optional.add_argument("--t1w-image-suffix", help="Use a specific T1w head image suffix. Eg, 'acq-mprage_T1w.nii.gz' selects "
                       "sub-participant/ses-session/sub-participant_ses-session_acq-mprage_T1w.nii.gz'. "
                       "Using this overrides BIDS filters for the T1w", type=str, default=None)
 optional.add_argument("--t1w-mask-dataset", help="BIDS dataset to use for brain masking the T1w. If not specified, "
                       "synB0's internal algorithm is used for brain masking", type=str, default=None)
 optional.add_argument("-w", "--work-dir", help="Temp dir for intermediate output, defaults to system "
-                      "TMPDIR if defined, otherwise '/tmp'", type=str, default=os.environ.get('TMPDIR', '/tmp'))
+                      "TMPDIR if defined, otherwise '/tmp'", type=str, default=os.environ.get('TMPDIR', '/scratch'))
 
 
 args = parser.parse_args()
@@ -116,9 +147,14 @@ if args.filter is not None:
 # Get all dMRI data files for the given subject and session
 dwi_groups = get_dwi_images(layout, args.participant_label, args.session_label, filter)
 
+if (args.combine_all_dwis):
+    # Combine all DWIs into one group - useful for when the acq-label is not consistent but
+    # the phase encoding direction is - eg, HCP data with dir98 and dir99
+    dwi_groups = {'combined': [item for sublist in dwi_groups.values() for item in sublist]}
+
 if args.t1w_image_suffix is not None:
     t1w_files = [os.path.join(args.bids_dataset, f"sub-{args.participant_label}", f"ses-{args.session_label}", 'anat',
-                f"sub_{args.participant_label}_ses-{args.session_label}_{args.t1w_image_suffix}")]
+                f"sub-{args.participant_label}_ses-{args.session_label}_{args.t1w_image_suffix}")]
 else:
     # return type files gets actual files not BIDSFile objects
     t1w_files = layout.get(subject=args.participant_label, session=args.session_label, suffix='T1w',
@@ -130,11 +166,17 @@ if (len(t1w_files) > 1):
     sys.exit(1)
 
 # Check t1w exists
-if len(t1w_files) == 0 or not os.path.exists(t1w_files[0]):
+if len(t1w_files) == 0:
     print("No T1w image found for subject " + args.participant_label + " session " + args.session_label)
+    sys.exit(1)
+if not os.path.exists(t1w_files[0]):
+    print("T1w image " + t1w_files[0] + " not found")
     sys.exit(1)
 
 t1w_path = t1w_files[0]
+
+# Get filename from the full path
+t1w_filename = os.path.basename(t1w_path)
 
 # If this is None, use synb0's internal brain masking
 t1w_skull_stripped_path = None
@@ -151,31 +193,18 @@ print("DWI groups: " + str(dwi_groups))
 
 if args.t1w_mask_dataset is not None:
     # Look in the mask dataset for a T1w mask matching the T1w image
-    mask_dir = os.path.join(args.t1w_mask_dataset, f"sub-{args.participant_label}", f"ses-{args.session_label}", 'anat')
-    # Get all json files in the mask directory
-    mask_sidecars = [f for f in os.listdir(mask_dir) if f.endswith('.json')]
+    t1w_skull_stripped_path = get_t1w_skull_stripped(args.t1w_mask_dataset, args.participant_label, args.session_label,
+                                                     t1w_filename)
+else:
+    # Search current dataset for a brain mask
+    t1w_skull_stripped_path = get_t1w_skull_stripped(args.bids_dataset, args.participant_label, args.session_label,
+                                                     t1w_filename)
 
-    # Get filename from the full path
-    t1w_filename = os.path.basename(t1w_path)
+if t1w_skull_stripped_path is not None:
+    t1w_is_skull_stripped = True
+else:
+    print("No T1w brain mask found for subject " + args.participant_label + " session " + args.session_label)
 
-    for mask_sidecar in mask_sidecars:
-        # Load the sidecar
-        with open(os.path.join(mask_dir, mask_sidecar)) as json_file:
-            mask_json = json.load(json_file)
-            # Check if the T1w image matches the T1w image in the mask sidecar
-            if mask_json['Sources'][0].endswith(t1w_filename):
-                # Found a match
-                t1w_mask = os.path.join(mask_dir, mask_sidecar.replace('.json', '.nii.gz'))
-                break
-
-    if t1w_mask is None:
-        print("No matching T1w mask found for subject " + args.participant_label + " session " + args.session_label)
-        print("Continuing without T1w mask")
-    else:
-        print("Using T1w mask " + t1w_mask)
-        t1w_skull_stripped_path = os.path.join(working_dir, "t1w_skull_stripped.nii.gz")
-        t1w_is_skull_stripped = True
-        subprocess.run(["fslmaths", t1w_path, "-mas", t1w_mask, t1w_skull_stripped_path])
 
 # Run synb0 on each group of DWIs
 for group in dwi_groups:
