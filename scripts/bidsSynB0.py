@@ -137,7 +137,7 @@ optional.add_argument("-w", "--work-dir", help="Temp dir for intermediate output
 args = parser.parse_args()
 
 # open the BIDS dataset
-layout = bids.BIDSLayout(args.bids_dataset, validate = True)
+layout = bids.BIDSLayout(args.bids_dataset, validate=False)
 
 # Get filter if provided
 filter = {}
