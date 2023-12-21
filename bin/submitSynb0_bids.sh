@@ -11,7 +11,7 @@ repoDir=${scriptDir%/bin}
 
 function usage() {
   echo "Usage:
-  $0 -v synb0_version -L logdir -- [options to bidsSynB0.py]
+  $0 -v synb0_version -L logdir [-n num_cores=1] -- [options to bidsSynB0.py]
 
   $0 -h for help
   "
@@ -28,19 +28,23 @@ cat << HELP
 
   This is a wrapper script to submit processing to bsub.
 
-  bidsSynB0 options (note that the -c arg is provided automatically by this wrapper):
+  bidsSynB0 options are below. The following args are set automatically by this wrapper:
+
+     -c / --container
+     -n / --num-threads
 
   `conda run -p /project/ftdc_pipeline/ftdc-picsl/miniconda/envs/ftdc-picsl-cp311 ${repoDir}/scripts/bidsSynB0.py -h`
-
 
 HELP
 
 }
 
+numThreads=1
 
-while getopts "L:v:h" opt; do
+while getopts "L:n:v:h" opt; do
   case $opt in
     L) logDir=$OPTARG;;
+    n) numThreads=$OPTARG;;
     v) synB0Version=$OPTARG;;
     h) help; exit 1;;
     \?) echo "Unknown option $OPTARG"; exit 2;;
@@ -65,6 +69,8 @@ if [[ ! -d ${logDir} ]]; then
     mkdir -p ${logDir}
 fi
 
-bsub -cwd . -o "${logDir}/synb0_${date}_%J.txt" \
+bsub -n $numThreads -cwd . -o "${logDir}/synb0_${date}_%J.txt" \
     conda run -p /project/ftdc_pipeline/ftdc-picsl/miniconda/envs/ftdc-picsl-cp311 ${repoDir}/scripts/bidsSynB0.py \
-      --container ${repoDir}/containers/synb0-${synB0Version}.sif $*
+      --container ${repoDir}/containers/synb0-${synB0Version}.sif \
+      --num-threads $numThreads \
+      $*
