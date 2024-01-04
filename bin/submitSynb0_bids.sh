@@ -1,6 +1,6 @@
 #!/bin/bash
 
-module load miniconda/3-22.11
+module load miniconda/3-22.11 > /dev/null 2>&1
 module load singularity/3.8.3
 module load fsl/6.0.3
 

@@ -18,7 +18,7 @@ def _filter_pybids_none_any(dct):
         for k, v in dct.items()
     }
 
-def bids_filter(value):
+def get_bids_filters(value):
     from bids.layout import Query
 
     if value and Path(value).exists():
@@ -67,14 +67,20 @@ def get_t1w_skull_stripped(dataset, participant_label, session_label, t1w_filena
     t1w_mask = None
     t1w_skull_stripped_path = None
 
+    found_mask = False
+
     for mask_sidecar in mask_sidecars:
         # Load the sidecar
         with open(os.path.join(mask_dir, mask_sidecar)) as json_file:
             mask_json = json.load(json_file)
             # Check if the T1w image matches the T1w image in the mask sidecar
-            if mask_json['Sources'][0].endswith(t1w_filename):
-                # Found a match
-                t1w_mask = os.path.join(mask_dir, mask_sidecar.replace('.json', '.nii.gz'))
+            for source in mask_json['Sources']:
+                if source.endswith(t1w_filename):
+                    # Found a match
+                    t1w_mask = os.path.join(mask_dir, mask_sidecar.replace('.json', '.nii.gz'))
+                    found_mask = True
+                    break
+            if found_mask:
                 break
 
     if t1w_mask is not None:
@@ -98,7 +104,7 @@ A BIDs filter can be used to select a subset of the data.
 Limitations:
 
  * Only one T1w image per subject/session is supported. If more than one is found, the
-script will exit.
+script will exit. Use a filter or the --t1w-image-suffix option to select a specific T1w image.
 
  * Data must be organized as sub-<participant_label>/ses-<session_label>.
 
@@ -118,7 +124,7 @@ required.add_argument("--session-label", help="session to process", type=str, re
 
 optional = parser.add_argument_group('Optional arguments')
 optional.add_argument("-h", "--help", action="help", help="show this help message and exit")
-optional.add_argument("-f", "--filter", help="BIDS filter file", type=str, default=None)
+optional.add_argument("-f", "--bids-filter", help="BIDS filter file", type=str, default=None)
 optional.add_argument("-n", "--num-threads", help="Number of computational threads", type=int, default=1)
 optional.add_argument("-t", "--total-readout-time", help="Total readout time for DWI. Some older DICOM files "
                       "do not provide this information, so it can be specified manually. Ignored if the BIDS "
@@ -129,7 +135,9 @@ optional.add_argument("--t1w-image-suffix", help="Use a specific T1w head image 
                       "sub-participant/ses-session/sub-participant_ses-session_acq-mprage_T1w.nii.gz'. "
                       "Using this overrides BIDS filters for the T1w", type=str, default=None)
 optional.add_argument("--t1w-mask-dataset", help="BIDS dataset to use for brain masking the T1w. If not specified, "
-                      "synB0's internal algorithm is used for brain masking", type=str, default=None)
+                      "the T1w dataset will be searched for an available mask. If no mask is found, synB0's internal "
+                      "BET call is used for brain masking - it is highly recommended to use a high-quality brain mask "
+                      "from a tool like HD-BET or synthstrip", type=str, default=None)
 optional.add_argument("-w", "--work-dir", help="Temp dir for intermediate output, defaults to system "
                       "TMPDIR if defined, otherwise '/scratch'", type=str, default=os.environ.get('TMPDIR', '/scratch'))
 
@@ -140,12 +148,12 @@ args = parser.parse_args()
 layout = bids.BIDSLayout(args.bids_dataset, validate=False)
 
 # Get filter if provided
-filter = {}
-if args.filter is not None:
-    filter = bids_filter(args.filter)
+bids_filters = {}
+if args.bids_filter is not None:
+    filter = get_bids_filters(args.bids_filter)
 
 # Get all dMRI data files for the given subject and session
-dwi_groups = get_dwi_images(layout, args.participant_label, args.session_label, filter)
+dwi_groups = get_dwi_images(layout, args.participant_label, args.session_label, bids_filters)
 
 if (args.combine_all_dwis):
     # Combine all DWIs into one group - useful for when the acq-label is not consistent but
@@ -158,7 +166,7 @@ if args.t1w_image_suffix is not None:
 else:
     # return type files gets actual files not BIDSFile objects
     t1w_files = layout.get(subject=args.participant_label, session=args.session_label, suffix='T1w',
-                           return_type='file', extension=['nii.gz'], **filter)
+                           return_type='file', extension=['nii.gz'], **bids_filters)
 
 if (len(t1w_files) > 1):
     print("More than one T1w image found for subject " + args.participant_label + " session " + args.session_label +
@@ -266,8 +274,7 @@ for group in dwi_groups:
                 sidecar = json.load(sidecar_fh)
                 sidecar['TotalReadoutTime'] = total_readout_time
             with open(sidecar_file, 'w') as sidecar_fh:
-                json.dump(fmap_sidecar, fmap_sidecar_fh, indent=2, sort_keys=True)
-
+                json.dump(sidecar, sidecar_fh, indent=2, sort_keys=True)
 
     # We need to put dir-<pe_direction> in the filename for the fmap/ to be BIDS compliant
     # The BIDS sidecar has letter codes i, i-, j, j-. I believe that k, k- are not supported by topup/eddy
@@ -296,7 +303,7 @@ for group in dwi_groups:
     # Get the first b0 image from the DWI
     b0_input = os.path.join(tmp_input_dir, 'b0.nii.gz')
 
-    # fslroi exists 0 if the file doesn't exist, so check manually
+    # fslroi exits 0 if the file doesn't exist, so check manually
     subprocess.run(['fslroi', dwi_ref.path, b0_input, '0', '1'], env=synb0_env)
     if not os.path.exists(b0_input):
         print("Could not extract b0 image from " + dwi_ref.path)
