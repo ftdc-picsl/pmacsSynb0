@@ -4,6 +4,8 @@ module load miniconda/3-22.11 > /dev/null 2>&1
 module load singularity/3.8.3
 module load fsl/6.0.3
 
+fsLicense="/appl/freesurfer-7.1.1/license.txt"
+
 scriptPath=$(readlink -f "$0")
 scriptDir=$(dirname "${scriptPath}")
 # Repo base dir under which we find bin/, containers/ and scripts/
@@ -30,8 +32,9 @@ cat << HELP
 
   bidsSynB0 options are below. The following args are set automatically by this wrapper:
 
-     -c / --container
-     -n / --num-threads
+     -c / --container (set by -v in this wrapper)
+     -n / --num-threads (set by -n in this wrapper)
+     --fs-license-file (hard-coded to ${fsLicense})
 
   `conda run -p /project/ftdc_pipeline/ftdc-picsl/miniconda/envs/ftdc-picsl-cp311 ${repoDir}/scripts/bidsSynB0.py -h`
 
@@ -73,4 +76,5 @@ bsub -n $numThreads -cwd . -o "${logDir}/synb0_${date}_%J.txt" \
     conda run -p /project/ftdc_pipeline/ftdc-picsl/miniconda/envs/ftdc-picsl-cp311 ${repoDir}/scripts/bidsSynB0.py \
       --container ${repoDir}/containers/synb0-${synB0Version}.sif \
       --num-threads $numThreads \
+      --fs-license-file ${fsLicense} \
       $*

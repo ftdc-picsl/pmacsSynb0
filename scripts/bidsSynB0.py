@@ -119,6 +119,7 @@ Requires: FSL, singularity
 required = parser.add_argument_group('Required arguments')
 required.add_argument("-c", "--container", help="synb0 container to use", type=str, required=True)
 required.add_argument("--bids-dataset", help="Input BIDS dataset", type=str, required=True)
+required.add_argument("--fs-license-file", help="Freesurfer license file", type=str, required=True)
 required.add_argument("--participant-label", help="participant to process", type=str, required=True)
 required.add_argument("--session-label", help="session to process", type=str, required=True)
 
@@ -331,6 +332,7 @@ for group in dwi_groups:
     synb0_cmd_list = ['singularity', 'run', '--cleanenv', '--no-home', '-B', f"{os.path.realpath(tmp_input_dir)}:/INPUTS",
                       '-B', f"{os.path.realpath(tmp_output_dir)}:/OUTPUTS",
                       '-B', f"{os.path.realpath(tmp_singularity_dir)}:/tmp",
+                      '-B', f"{os.path.realpath(args.fs_license_file)}:/extra/freesurfer/license.txt",
                 args.container, '--notopup']
 
     if t1w_is_skull_stripped:
