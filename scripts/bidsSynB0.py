@@ -4,6 +4,7 @@ import argparse
 import bids
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -146,7 +147,10 @@ optional.add_argument("-w", "--work-dir", help="Temp dir for intermediate output
 args = parser.parse_args()
 
 # open the BIDS dataset
-layout = bids.BIDSLayout(args.bids_dataset, validate=False)
+# Get only selected participant, speeds up processing
+ignore_pattern = re.compile(r'^(?!.*/sub-' + args.participant_label + r'($|/))')
+indexer = bids.BIDSLayoutIndexer(validate=False, ignore=[ignore_pattern])
+layout = bids.BIDSLayout(args.bids_dataset, indexer=indexer)
 
 # Get filter if provided
 bids_filters = {}
